@@ -15,7 +15,8 @@ class BaseModel(models.Model):
     def save_and_return_object(self):
         super().save()
         return self
-    
+
+
 class AdministrativeLevel(BaseModel):
     name = models.CharField(max_length=255)
     parent = models.ForeignKey('AdministrativeLevel', null=True, blank=True, on_delete=models.CASCADE)
@@ -29,7 +30,7 @@ class AdministrativeLevel(BaseModel):
     created_date = models.DateTimeField(auto_now_add=True)
     updated_date = models.DateTimeField(auto_now=True)
     no_sql_db_id = models.CharField(null=True, blank=True, max_length=255)
-
+    facilitator_id = models.CharField(max_length=255, null=True, blank=True)
     
     class Meta:
         unique_together = ['name', 'parent', 'type']
@@ -140,10 +141,10 @@ def update_or_create_amd_couch(sender, instance, **kwargs):
     else:
         client.update_administrative_level(instance)
 
+
 def delete_amd_couch(sender, instance, **kwargs):
     client = CddClient()
     client.delete_administrative_level(instance)
-
 
 
 post_save.connect(update_or_create_amd_couch, sender=AdministrativeLevel)

@@ -262,6 +262,3 @@ class SubprojectImage(BaseModel):
     order = models.IntegerField(default=0)
     principal = models.BooleanField(default=False)
     date_taken = models.DateField()
-
-
-

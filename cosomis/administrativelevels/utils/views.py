@@ -1,5 +1,12 @@
+import os
+import time
+import json
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import generic
+
+from django.http import HttpResponse
+from django.utils.translation import gettext_lazy as _
+from storages.backends.s3boto3 import S3Boto3Storage
 
 from cosomis.mixins import AJAXRequestMixin, JSONResponseMixin
 from administrativelevels.models import AdministrativeLevel
@@ -15,6 +22,7 @@ class GetChoicesForNextAdministrativeLevelView(AJAXRequestMixin, LoginRequiredMi
         d = [{'id': elt.id, 'name': elt.name} for elt in data if((not elt.geographical_unit) or (elt.geographical_unit and geographical_unit_id and elt.geographical_unit.id == int(geographical_unit_id)))]
 
         return self.render_to_json_response(sorted(d, key=lambda o: o['name']), safe=False)
+
 
 class GetChoicesAdministrativeLevelByGeographicalUnitView(AJAXRequestMixin, LoginRequiredMixin, JSONResponseMixin, generic.View):
     def get(self, request, *args, **kwargs):

@@ -4,6 +4,7 @@
 import time
 from no_sql_client import NoSQLClient
 
+
 def iterate_administrative_level(adm_list, type):
 
     for administrative_level in adm_list.filter(type=type):

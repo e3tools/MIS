@@ -10,8 +10,10 @@ import pandas as pd
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.utils.translation import gettext_lazy as _
 from django.core.paginator import Paginator
-from django.db.models import Q
 
+from no_sql_client import NoSQLClient
+
+from cdd_db.models import Facilitator
 from administrativelevels.models import AdministrativeLevel, GeographicalUnit, CVD
 from administrativelevels.libraries import convert_file_to_dict, download_file
 from administrativelevels import functions as administrativelevels_functions
@@ -21,6 +23,7 @@ from usermanager.permissions import (
     CDDSpecialistPermissionRequiredMixin, SuperAdminPermissionRequiredMixin,
     AdminPermissionRequiredMixin
     )
+
 
 class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
     """Class to present the detail page of one village"""
@@ -36,12 +39,156 @@ class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
             'title': title
         },
     ]
+    nsc_class = NoSQLClient
     
     def get_context_data(self, **kwargs):
         context = super(VillageDetailView, self).get_context_data(**kwargs)
-        if context.get("object") and context.get("object").type == "Village" : # Verify if the administrativeLevel type is Village
-            return context
-        raise Http404
+        obj = self.get_object()
+        if obj.type != "Village":  # Verify if the administrativeLevel type is Village
+            raise Http404
+        facilitator = Facilitator.objects.get(id=obj.facilitator_id)
+        nsc = self.nsc_class()
+        database = nsc.get_db(facilitator.no_sql_db_name)
+
+        context.update(self._get_population_data(database))
+        context.update(self._get_planning_status(database, obj))
+        context.update(self._get_attachments(database, obj))
+
+        context.update({
+            'facilitator': facilitator.name if facilitator.name is not None else facilitator.email
+        })
+
+        return context
+
+    def _get_population_data(self, db):
+
+        total_participants = self._get_form_value(tag='total_participants', data_base=db)
+
+        total_men = "%s (%s%%)" % (
+            self._get_form_value(tag='total_men', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='total_men', data_base=db) * 100 / total_participants))
+        )
+        total_women = "%s (%s%%)" % (
+            self._get_form_value(tag='total_women', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='total_women', data_base=db) * 100 / total_participants))
+        )
+        younger_35 = "%s (%s%%)" % (
+            self._get_form_value(tag='younger_35', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='younger_35', data_base=db) * 100 / total_participants))
+        )
+        older_65 = "%s (%s%%)" % (
+            self._get_form_value(tag='older_65', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='older_65', data_base=db) * 100 / total_participants))
+        )
+        total_handicapped = "%s (%s%%)" % (
+            self._get_form_value(tag='total_handicapped', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='total_handicapped', data_base=db) * 100 / total_participants))
+        )
+        total_farmers = "%s (%s%%)" % (
+            self._get_form_value(tag='total_farmers', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='total_farmers', data_base=db) * 100 / total_participants))
+        )
+        total_breeders = "%s (%s%%)" % (
+            self._get_form_value(tag='total_breeders', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='total_breeders', data_base=db) * 100 / total_participants))
+        )
+        number_ethnic = "%s (%s%%)" % (
+            self._get_form_value(tag='number_ethnic', data_base=db),
+            str(self._format_number_user_friendly(self._get_form_value(tag='number_ethnic', data_base=db) * 100 / total_participants))
+        )
+        return {
+            'total': total_participants,
+            'manages': self._get_form_value(tag='families_nuclei', data_base=db),
+            'men_women': "%s / %s" % (total_men, total_women),
+            'youth': younger_35,
+            'elderly_people': older_65,
+            'handicapped': total_handicapped,
+            'farmers_breeders': "%s / %s" % (total_farmers, total_breeders),
+            'languages': self._get_form_value(tag='languages', data_base=db),
+            'ethnic_minorities': number_ethnic,
+            'number_ethnic': number_ethnic
+        }
+
+    def _get_planning_status(self, db, obj):
+        count = 1
+        while True:
+            try:
+                activity_document = db.get_query_result(
+                    {
+                        "type": "activity",
+                        "order": count,
+                        "administrative_level_id": obj.no_sql_db_id
+                    }
+                )[0]
+            except Exception as e:
+                print(e)
+                break
+            if len(activity_document) > 0 and activity_document[0]["completed_tasks"] < activity_document[0]["total_tasks"]:
+                activity = activity_document[0]
+                break
+            else:
+                count += 1
+
+        phase_document = db.get_query_result(
+            {
+                "_id": activity['phase_id'],
+                "type": "phase",
+                "administrative_level_id": obj.no_sql_db_id
+            }
+        )[0]
+        task_document = db.get_query_result(
+            {
+                "type": "task",
+                "order": activity['completed_tasks'] + 1,
+                "activity_id": activity["_id"]
+            }
+        )[0]
+
+        return {
+            "phase": phase_document[0]['name'],
+            "activity": activity['name'],
+            "task": task_document[0]['name'],
+            "completed": self._format_number_user_friendly(activity['completed_tasks'] * 100 / activity['total_tasks']),
+            "priorities_identified": "",
+            "submission": ""
+        }
+
+    def _get_attachments(self, db, obj):
+        attachments = list()
+        attachments_documents = db.get_query_result(
+            {
+                "type": "task",
+                "administrative_level_id": obj.no_sql_db_id,
+                "$not": {
+                    "attachments": []
+                }
+            }
+        )[0]
+        for attachments_document in attachments_documents:
+            attachments += attachments_document["attachments"]
+        return {
+            "attachments": [i for i in attachments if "image" in i['type']]
+        }
+
+    def _get_form_value(self, tag, data_base):
+        from_document = data_base.get_query_result(
+            {
+                "mis_tags": {
+                    "$elemMatch": {
+                        "tag": tag
+                    }
+                }
+            }
+        )[0]
+        tag_list = from_document[0]['mis_tags']
+        form_label = [i['form_input'] for i in tag_list if i['tag'] == tag][0]
+        try:
+            return from_document[0]['form_response'][0][form_label]
+        except KeyError:
+            return ''
+
+    def _format_number_user_friendly(self, num: float):
+        return int(num) if num.is_integer() else num
 
 
 class AdministrativeLevelDetailView(PageMixin, LoginRequiredMixin, DetailView):
@@ -85,6 +232,7 @@ class AdministrativeLevelCreateView(PageMixin, LoginRequiredMixin, AdminPermissi
             'title': title
         },
     ]
+
     def get_parent(self, type: str):
         parent = None
         if type == "Prefecture":
@@ -97,7 +245,8 @@ class AdministrativeLevelCreateView(PageMixin, LoginRequiredMixin, AdminPermissi
             parent = "Canton"
         return parent
 
-    form_class = AdministrativeLevelForm # specify the class form to be displayed
+    form_class = AdministrativeLevelForm  # specify the class form to be displayed
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form'] = AdministrativeLevelForm(self.get_parent(self.request.GET.get("type")))

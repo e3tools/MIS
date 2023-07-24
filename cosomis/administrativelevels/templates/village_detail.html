@@ -11,64 +11,181 @@
 <div class="row">
     <div class="col-7">
         <div class="card">
-            <img class="card-img rounded" src="{% static 'images/village-image.jpg' %}" width="733" height="300"
-                alt="Card image">
+            <div id="carouselControls" class="carousel slide" data-ride="carousel">
+                <div class="carousel-inner">
+                    {% for image in attachments %}
+                    <div class="carousel-item{% if forloop.first %} active{% endif %}">
+                        <img class="d-block w-100" src="{{ image.attachment.uri|imgAWSS3Filter }}" alt="{{ image.name }}">
 
-            <div class="card-img-overlay d-flex flex-column">
-                <div class="mt-auto">
-                    <div class="row">
-                        <div class="col-6">
-                            <div class="card rounded-3" style="background-color: wheat; opacity: 75% !important;">
-                                <div class="card-body">
-                                    <h5 class="card-title">{{ object.name }}</h5>
-                                    <p class="card-text">{{ object.parent.parent.parent.parent.name|title }}</p>
+                        <div class="card-img-overlay d-flex flex-column">
+                            <div class="mt-auto">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="card rounded-3" style="background-color: wheat; opacity: 75% !important;">
+                                            <div class="card-body">
+                                                <h5 class="card-title">{{ object.name }}</h5>
+                                                <p class="card-text">{{ object.parent.parent.parent.parent.name|title }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    {% empty %}
+                    <div class="carousel-item active">
+                        <img class="card-img d-block w-100 rounded" src="{% static 'images/village-image.jpg' %}" alt="Card image">
 
+                        <div class="card-img-overlay d-flex flex-column">
+                            <div class="mt-auto">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="card rounded-3" style="background-color: wheat; opacity: 75% !important;">
+                                            <div class="card-body">
+                                                <h5 class="card-title">{{ object.name }}</h5>
+                                                <p class="card-text">{{ object.parent.parent.parent.parent.name|title }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
+                <a class="carousel-control-prev" href="#carouselControls" role="button" data-slide="prev">
+                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                    <span class="sr-only">{% translate 'Previous' %}</span>
+                </a>
+                <a class="carousel-control-next" href="#carouselControls" role="button" data-slide="next">
+                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                    <span class="sr-only">{% translate 'Next' %}</span>
+                </a>
             </div>
-
         </div>
     </div>
+
     <div class="col-5">
         <div class="card">
             <div class="card-body">
+
+{#                <div class="card">#}
+{#                    <div class="card-body">#}
+{#                        <div class="clearfix">#}
+{#                            <div class="float-left">#}
+{#                                <h5 class="font-weight-bold">{% translate 'Facilitator' %}</h5>#}
+{#                            </div>#}
+{#                            <div class="float-right">#}
+{#                                <a href="#" class="font-weight-bold">{% translate 'View' %}</a>#}
+{#                            </div>#}
+{#                        </div>#}
+{#                        <div class="card bg-light" style="height: 30px;">#}
+{#                            <div class="card-body">#}
+{#                                <h5 class="font-weight-bold">DJOLOUGUE Kanfiaguin</h5>#}
+{#                            </div>#}
+{#                        </div>#}
+{#                    </div>#}
+{#                </div>#}
+{##}
+{#                <div class="card">#}
+{#                    <div class="card-body">#}
+{#                        <div class="clearfix">#}
+{#                            <div>#}
+{#                                <h5 class="font-weight-bold">{% translate 'Last Updated' %}</h5>#}
+{#                            </div>#}
+{#                        </div>#}
+{#                        <div class="card bg-light" style="height: 30px;">#}
+{#                            <div class="card-body">#}
+{#                                <h5 class="font-weight-bold">20/08/2022</h5>#}
+{#                            </div>#}
+{#                        </div>#}
+{#                    </div>#}
+{#                </div>#}
 
                 <div class="card">
                     <div class="card-body">
                         <div class="clearfix">
                             <div class="float-left">
-                                <h5 class="font-weight-bold">{% translate 'Facilitator' %}</h5>
-                            </div>
-                            <div class="float-right">
-                                <a href="#" class="font-weight-bold">{% translate 'View' %}</a>
+                                <h5 class="font-weight-bold">{% translate 'Population' %}</h5>
                             </div>
                         </div>
-                        <div class="card bg-light" style="height: 30px;">
+                        <div class="card bg-light">
                             <div class="card-body">
-                                <h5 class="font-weight-bold">DJOLOUGUE Kanfiaguin</h5>
+                                <div class="align-content-center">
+                                    <table class="table">
+                                        <tr>
+                                            <td class="text-right">{% translate 'Total' %}</td><td class="text-left">{{ total }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right"># {% translate 'Manages' %}</td><td class="text-left">{{ manages }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right">{% translate 'Men' %} / {% translate 'Women' %}</td><td class="text-left">{{ men_women }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right">{% translate 'Youth' %}</td><td class="text-left">{{ youth }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right">{% translate 'Elderly people' %}</td><td class="text-left">{{ elderly_people }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right">{% translate 'Handicapped' %}</td><td class="text-left">{{ handicapped }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right">{% translate 'Farmers' %} / {% translate 'Breeders' %}</td><td class="text-left">{{ farmers_breeders }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right">{% translate 'Ethnic minorities' %}</td><td class="text-left">{{ ethnic_minorities }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="text-right">{% translate 'Languages' %}</td><td class="text-left">{{ languages }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="card">
+
+        <div class="card">
+            <div class="card-body">
+                <div class="clearfix">
+                    <div>
+                        <h5 class="font-weight-bold">{% translate 'Planning status' %}</h5>
+                    </div>
+                </div>
+                <div class="card bg-light">
                     <div class="card-body">
-                        <div class="clearfix">
-                            <div>
-                                <h5 class="font-weight-bold">{% translate 'Last Updated' %}</h5>
-                            </div>
-                        </div>
-                        <div class="card bg-light" style="height: 30px;">
-                            <div class="card-body">
-                                <h5 class="font-weight-bold">20/08/2022</h5>
-                            </div>
+                        <div class="align-content-center">
+                            <table class="table">
+                                <tr>
+                                    <td class="text-right">{% translate 'Phase' %}</td><td class="text-left">{{ phase }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-right">{% translate 'Activity' %}</td><td class="text-left">{{ activity }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-right">{% translate 'Task' %}</td><td class="text-left">{{ task }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-right">% {% translate 'Completed' %}</td><td class="text-left">{{ completed }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-right">{% translate 'Priorities identified' %}</td><td class="text-left">{{ priorities_identified }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-right">VDP {% translate 'Submission' %}</td><td class="text-left">{{ submission }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-right">{% translate 'Facilitator' %}</td><td class="text-left">{{ facilitator }}</td>
+                                </tr>
+                            </table>
                         </div>
                     </div>
                 </div>
-
+            </div>
+        </div>
             </div>
         </div>
     </div>
@@ -82,13 +199,12 @@
                     <div class="float-left">
                         <h5 class="font-weight-bold">{% translate 'Financial' %}</h5>
                     </div>
+                    {% if user.is_superuser or user|has_group:"Admin" %}
                     <div class="float-right">
-                        <a href="#" class="font-weight-bold">{% translate 'Add Movement' %} 
-                        {% if user.is_superuser or user|has_group:"Admin" %}
-                        <i
-                                class="fas fa-plus"></i></a>
-                        {% endif %}
+                        <a href="#" class="font-weight-bold">{% translate 'Add Movement' %}
+                        <i class="fas fa-plus"></i></a>
                     </div>
+                    {% endif %}
                 </div>
                 <div class="card bg-light" style="height: 30px;">
                     <div class="card-body">

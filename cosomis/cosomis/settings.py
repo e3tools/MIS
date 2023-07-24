@@ -50,6 +50,7 @@ INSTALLED_APPS = [
 ]
 
 CREATED_APPS = [
+    'cdd_db',
     'usermanager',
     'subprojects',
     'administrativelevels',
@@ -104,9 +105,14 @@ WSGI_APPLICATION = 'cosomis.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/1.8/ref/settings/#databases
 
+EXTERNAL_DATABASE_NAME = 'cdd_db'
+
 DATABASES = {
-    'default': env.db()
+    'default': env.db(),
+    EXTERNAL_DATABASE_NAME: env.db('LEGACY_DATABASE_URL')
 }
+
+DATABASE_ROUTERS = ["cdd_db.db_routers.CDDRouter"]
 
 
 # Internationalization
@@ -180,7 +186,7 @@ AWS_ACCESS_KEY_ID = env('S3_ACCESS')
 
 AWS_SECRET_ACCESS_KEY = env('S3_SECRET')
 
-#REST API
+# REST API
 REST_FRAMEWORK = {
     # https://github.com/tfranzel/drf-spectacular
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
