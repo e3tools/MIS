@@ -22,7 +22,7 @@ from .forms import GeographicalUnitForm, CVDForm, AdministrativeLevelForm
 from usermanager.permissions import (
     CDDSpecialistPermissionRequiredMixin, SuperAdminPermissionRequiredMixin,
     AdminPermissionRequiredMixin
-    )
+)
 
 
 class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
@@ -40,7 +40,7 @@ class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
         },
     ]
     nsc_class = NoSQLClient
-    
+
     def get_context_data(self, **kwargs):
         context = super(VillageDetailView, self).get_context_data(**kwargs)
         obj = self.get_object()
@@ -53,6 +53,7 @@ class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
         context.update(self._get_population_data(database))
         context.update(self._get_planning_status(database, obj))
         context.update(self._get_attachments(database, obj))
+        context.update(self._get_project_cycle(database, obj))
 
         context.update({
             'facilitator': facilitator.name if facilitator.name is not None else facilitator.email
@@ -66,35 +67,43 @@ class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
 
         total_men = "%s (%s%%)" % (
             self._get_form_value(tag='total_men', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='total_men', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='total_men', data_base=db) * 100 / total_participants))
         )
         total_women = "%s (%s%%)" % (
             self._get_form_value(tag='total_women', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='total_women', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='total_women', data_base=db) * 100 / total_participants))
         )
         younger_35 = "%s (%s%%)" % (
             self._get_form_value(tag='younger_35', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='younger_35', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='younger_35', data_base=db) * 100 / total_participants))
         )
         older_65 = "%s (%s%%)" % (
             self._get_form_value(tag='older_65', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='older_65', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='older_65', data_base=db) * 100 / total_participants))
         )
         total_handicapped = "%s (%s%%)" % (
             self._get_form_value(tag='total_handicapped', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='total_handicapped', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='total_handicapped', data_base=db) * 100 / total_participants))
         )
         total_farmers = "%s (%s%%)" % (
             self._get_form_value(tag='total_farmers', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='total_farmers', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='total_farmers', data_base=db) * 100 / total_participants))
         )
         total_breeders = "%s (%s%%)" % (
             self._get_form_value(tag='total_breeders', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='total_breeders', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='total_breeders', data_base=db) * 100 / total_participants))
         )
         number_ethnic = "%s (%s%%)" % (
             self._get_form_value(tag='number_ethnic', data_base=db),
-            str(self._format_number_user_friendly(self._get_form_value(tag='number_ethnic', data_base=db) * 100 / total_participants))
+            str(self._format_number_user_friendly(
+                self._get_form_value(tag='number_ethnic', data_base=db) * 100 / total_participants))
         )
         return {
             'total': total_participants,
@@ -123,7 +132,8 @@ class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
             except Exception as e:
                 print(e)
                 break
-            if len(activity_document) > 0 and activity_document[0]["completed_tasks"] < activity_document[0]["total_tasks"]:
+            if len(activity_document) > 0 and activity_document[0]["completed_tasks"] < activity_document[0][
+                "total_tasks"]:
                 activity = activity_document[0]
                 break
             else:
@@ -170,6 +180,55 @@ class VillageDetailView(PageMixin, LoginRequiredMixin, DetailView):
             "attachments": [i for i in attachments if "image" in i['type']]
         }
 
+    def _get_project_cycle(self, db, obj):
+
+        phases = db.get_query_result(
+            {
+                "type": "phase"
+            }
+        )
+
+        resp = {
+            'phases': list()
+        }
+
+        for phase in phases:
+            activities = db.get_query_result(
+                {
+                    "type": "activity",
+                    "phase_id": phase['_id']
+                }
+            )
+            activities_list = list()
+            for activity in activities:
+                tasks = db.get_query_result(
+                    {
+                        "type": "task",
+                        "activity_id": activity['_id']
+                    }
+                )
+                tasks_list = list()
+                for task in tasks:
+                    tasks_list.append({
+                        'name': task['name'],
+                        'slug': task['_id'],
+                        'status': "Completed" if task['completed'] else "Due"
+                    })
+
+                activities_list.append({
+                    'name': activity['name'],
+                    'id': activity['_id'],
+                    'tasks': tasks_list
+                })
+
+            resp['phases'].append({
+                'name': phase['name'],
+                'id': phase['_id'],
+                'activities': activities_list
+            })
+
+        return resp
+
     def _get_form_value(self, tag, data_base):
         from_document = data_base.get_query_result(
             {
@@ -205,7 +264,7 @@ class AdministrativeLevelDetailView(PageMixin, LoginRequiredMixin, DetailView):
             'title': title
         },
     ]
-    
+
     def get_context_data(self, **kwargs):
         context = super(AdministrativeLevelDetailView, self).get_context_data(**kwargs)
         _type = self.request.GET.get("type", "Village")
@@ -219,7 +278,7 @@ class AdministrativeLevelDetailView(PageMixin, LoginRequiredMixin, DetailView):
         ]
         return context
 
-        
+
 class AdministrativeLevelCreateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin, CreateView):
     model = AdministrativeLevel
     template_name = 'administrativelevel_create.html'
@@ -251,7 +310,7 @@ class AdministrativeLevelCreateView(PageMixin, LoginRequiredMixin, AdminPermissi
         context = super().get_context_data(**kwargs)
         context['form'] = AdministrativeLevelForm(self.get_parent(self.request.GET.get("type")))
         return context
-    
+
     def post(self, request, *args, **kwargs):
         form = AdministrativeLevelForm(self.get_parent(self.request.GET.get("type")), request.POST)
         if form.is_valid():
@@ -272,6 +331,7 @@ class AdministrativeLevelUpdateView(PageMixin, LoginRequiredMixin, AdminPermissi
             'title': title
         },
     ]
+
     def get_parent(self, type: str):
         parent = None
         if type == "Prefecture":
@@ -284,20 +344,23 @@ class AdministrativeLevelUpdateView(PageMixin, LoginRequiredMixin, AdminPermissi
             parent = "Canton"
         return parent
 
-    form_class = AdministrativeLevelForm # specify the class form to be displayed
+    form_class = AdministrativeLevelForm  # specify the class form to be displayed
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         print(self.request.GET.get("type"))
-        context['form'] = AdministrativeLevelForm(self.get_parent(self.request.GET.get("type")), instance=self.get_object())
+        context['form'] = AdministrativeLevelForm(self.get_parent(self.request.GET.get("type")),
+                                                  instance=self.get_object())
         return context
-    
+
     def post(self, request, *args, **kwargs):
-        form = AdministrativeLevelForm(self.get_parent(self.request.GET.get("type")), request.POST, instance=self.get_object())
+        form = AdministrativeLevelForm(self.get_parent(self.request.GET.get("type")), request.POST,
+                                       instance=self.get_object())
         if form.is_valid():
             form.save()
             return redirect('administrativelevels:list')
         return super(AdministrativeLevelUpdateView, self).get(request, *args, **kwargs)
-    
+
 
 class UploadCSVView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin, TemplateView):
     """Class to upload and save the administrativelevels"""
@@ -323,20 +386,26 @@ class UploadCSVView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
             try:
                 datas = convert_file_to_dict.conversion_file_xlsx_merger_to_dict(
                     request.FILES.get('file'), request.POST.get('sheet_name'),
-                    columns_fillna= ["Canton", "Villages", "Sous-projets prioritaire de la sous-composante 1.3 (Besoins des jeunes)"]
-                    )
+                    columns_fillna=["Canton", "Villages",
+                                    "Sous-projets prioritaire de la sous-composante 1.3 (Besoins des jeunes)"]
+                )
             except pd.errors.ParserError as exc:
                 datas = convert_file_to_dict.conversion_file_csv_merger_to_dict(
                     request.FILES.get('file'), request.POST.get('sheet_name'),
-                    columns_fillna= ["Canton", "Villages", "Sous-projets prioritaire de la sous-composante 1.3 (Besoins des jeunes)"]
-                    )
+                    columns_fillna=["Canton", "Villages",
+                                    "Sous-projets prioritaire de la sous-composante 1.3 (Besoins des jeunes)"]
+                )
             except Exception as exc:
                 messages.info(request, _("An error has occurred..."))
-            
+
             try:
                 administrative_level_id = request.POST["administrative_level_id"]
-                message, file_path = administrativelevels_functions.save_csv_datas_priorities_in_db(datas, administrative_level_id if bool(request.POST.get("administrative_level_id_checkbox")) else 0, _type) # call function to save CSV datas in database
-                
+                message, file_path = administrativelevels_functions.save_csv_datas_priorities_in_db(datas,
+                                                                                                    administrative_level_id if bool(
+                                                                                                        request.POST.get(
+                                                                                                            "administrative_level_id_checkbox")) else 0,
+                                                                                                    _type)  # call function to save CSV datas in database
+
                 return download_file.download(request, file_path, "text/plain")
 
                 # if message:
@@ -347,19 +416,22 @@ class UploadCSVView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
         elif _type == "subproject_new":
             """Load Administrative Levels"""
             try:
-                datas = convert_file_to_dict.conversion_file_xlsx_to_dict(request.FILES.get('file'), request.POST.get('sheet_name'))
+                datas = convert_file_to_dict.conversion_file_xlsx_to_dict(request.FILES.get('file'),
+                                                                          request.POST.get('sheet_name'))
             except pd.errors.ParserError as exc:
-                datas = convert_file_to_dict.conversion_file_csv_to_dict(request.FILES.get('file'), request.POST.get('sheet_name'))
+                datas = convert_file_to_dict.conversion_file_csv_to_dict(request.FILES.get('file'),
+                                                                         request.POST.get('sheet_name'))
             except Exception as exc:
                 messages.info(request, _("An error has occurred..."))
             try:
-                message, file_path = administrativelevels_functions.save_csv_datas_priorities_in_db(datas, 0, _type) # call function to save CSV datas in database
-                
+                message, file_path = administrativelevels_functions.save_csv_datas_priorities_in_db(datas, 0,
+                                                                                                    _type)  # call function to save CSV datas in database
+
                 return download_file.download(request, file_path, "text/plain")
-            
+
             except Exception as exc:
                 raise Http404
-            
+
         else:
             """Load Administrative Levels"""
             try:
@@ -368,18 +440,18 @@ class UploadCSVView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
                 datas = convert_file_to_dict.conversion_file_csv_to_dict(request.FILES.get('file'))
             except Exception as exc:
                 messages.info(request, _("An error has occurred..."))
-            
-            message = administrativelevels_functions.save_csv_file_datas_in_db(datas) # call function to save CSV datas in database
-            
+
+            message = administrativelevels_functions.save_csv_file_datas_in_db(
+                datas)  # call function to save CSV datas in database
+
         if message:
             messages.info(request, message)
 
         return redirect(redirect_path)
-    
+
     def get(self, request, *args, **kwargs):
         context = super(UploadCSVView, self).get(request, *args, **kwargs)
         return context
-
 
 
 class DownloadCSVView(PageMixin, LoginRequiredMixin, TemplateView):
@@ -401,7 +473,7 @@ class DownloadCSVView(PageMixin, LoginRequiredMixin, TemplateView):
         try:
             file_path = administrativelevels_functions.get_administratives_levels_under_file_excel_or_csv(
                 file_type=request.POST.get("file_type"),
-                params={"type":request.POST.get("type"), "value_of_type":request.POST.get("value_of_type")}
+                params={"type": request.POST.get("type"), "value_of_type": request.POST.get("value_of_type")}
             )
 
         except Exception as exc:
@@ -411,18 +483,17 @@ class DownloadCSVView(PageMixin, LoginRequiredMixin, TemplateView):
             return redirect('administrativelevels:list')
         else:
             return download_file.download(
-                request, 
+                request,
                 file_path,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-    
 
 
 class AdministrativeLevelsListView(PageMixin, LoginRequiredMixin, ListView):
     """Display administrative level list"""
 
     model = AdministrativeLevel
-    queryset = [] # AdministrativeLevel.objects.filter(type="Village")
+    queryset = []  # AdministrativeLevel.objects.filter(type="Village")
     template_name = 'administrativelevels_list.html'
     context_object_name = 'administrativelevels'
     title = _('Administrative levels')
@@ -443,20 +514,21 @@ class AdministrativeLevelsListView(PageMixin, LoginRequiredMixin, ListView):
                 ads = AdministrativeLevel.objects.filter(type=_type)
                 return Paginator(ads, ads.count()).get_page(page_number)
             search = search.upper()
-            return Paginator(AdministrativeLevel.objects.filter(type=_type, name__icontains=search), 100).get_page(page_number)
+            return Paginator(AdministrativeLevel.objects.filter(type=_type, name__icontains=search), 100).get_page(
+                page_number)
         else:
             return Paginator(AdministrativeLevel.objects.filter(type=_type), 100).get_page(page_number)
 
         # return super().get_queryset()
+
     def get_context_data(self, **kwargs):
         ctx = super(AdministrativeLevelsListView, self).get_context_data(**kwargs)
         ctx['search'] = self.request.GET.get("search", None)
         ctx['type'] = self.request.GET.get("type", "Village")
         return ctx
-    
 
 
-#Obstacles
+# Obstacles
 class ObstaclesListView(PageMixin, LoginRequiredMixin, TemplateView):
     model = VillageObstacle
     template_name = 'priorities/obstacles.html'
@@ -478,23 +550,24 @@ class ObstaclesListView(PageMixin, LoginRequiredMixin, TemplateView):
         ctx.setdefault('administrativelevel_village', ObstaclesListView.administrativelevel_village)
         ctx.setdefault('OBSTACLES_FOCUS_GROUP', OBSTACLES_FOCUS_GROUP)
 
-        ctx.setdefault('obstacles', VillageObstacle.objects.filter(administrative_level_id=ObstaclesListView.administrative_level_id).order_by('ranking'))
+        ctx.setdefault('obstacles', VillageObstacle.objects.filter(
+            administrative_level_id=ObstaclesListView.administrative_level_id).order_by('ranking'))
 
         return ctx
 
     def get(self, request, *args, **kwargs):
         try:
             ObstaclesListView.administrative_level_id = kwargs['administrative_level_id']
-            ObstaclesListView.administrativelevel_village = AdministrativeLevel.objects.get(id=ObstaclesListView.administrative_level_id, type="Village")
+            ObstaclesListView.administrativelevel_village = AdministrativeLevel.objects.get(
+                id=ObstaclesListView.administrative_level_id, type="Village")
             context = super(ObstaclesListView, self).get(request, *args, **kwargs)
             # context['obstacles'] = VillageObstacle.objects.filter(administrative_level_id=ObstaclesListView.administrative_level_id)
         except Exception as exc:
             raise Http404
         return context
-    
 
     def post(self, request, *args, **kwargs):
-        
+
         group = request.POST.get('group')
         description = request.POST.get('description')
         if group and description:
@@ -529,6 +602,7 @@ class ObstaclesListView(PageMixin, LoginRequiredMixin, TemplateView):
 
         return self.get(request, *args, **kwargs)
 
+
 @login_required
 def obstacle_delete(request, obstacle_id):
     """Function to delete one obstacle"""
@@ -540,12 +614,11 @@ def obstacle_delete(request, obstacle_id):
         messages.info(request, _("Obstacle delete successfully"))
     except Exception as exc:
         raise Http404
-    
+
     return redirect('administrativelevels:priorities_obstacles', administrative_level_id=administrative_level_id)
 
 
-
-#Goals
+# Goals
 class GoalsListView(PageMixin, LoginRequiredMixin, TemplateView):
     model = VillageGoal
     template_name = 'priorities/goals.html'
@@ -567,23 +640,24 @@ class GoalsListView(PageMixin, LoginRequiredMixin, TemplateView):
         ctx.setdefault('administrativelevel_village', GoalsListView.administrativelevel_village)
         ctx.setdefault('GOALS_FOCUS_GROUP', GOALS_FOCUS_GROUP)
 
-        ctx.setdefault('goals', VillageGoal.objects.filter(administrative_level_id=GoalsListView.administrative_level_id).order_by('ranking'))
+        ctx.setdefault('goals', VillageGoal.objects.filter(
+            administrative_level_id=GoalsListView.administrative_level_id).order_by('ranking'))
 
         return ctx
 
     def get(self, request, *args, **kwargs):
         try:
             GoalsListView.administrative_level_id = kwargs['administrative_level_id']
-            GoalsListView.administrativelevel_village = AdministrativeLevel.objects.get(id=GoalsListView.administrative_level_id, type="Village")
+            GoalsListView.administrativelevel_village = AdministrativeLevel.objects.get(
+                id=GoalsListView.administrative_level_id, type="Village")
             context = super(GoalsListView, self).get(request, *args, **kwargs)
             # context['goals'] = VillageGoal.objects.filter(administrative_level_id=GoalsListView.administrative_level_id)
         except Exception as exc:
             raise Http404
         return context
-    
 
     def post(self, request, *args, **kwargs):
-        
+
         group = request.POST.get('group')
         description = request.POST.get('description')
         if group and description:
@@ -618,6 +692,7 @@ class GoalsListView(PageMixin, LoginRequiredMixin, TemplateView):
 
         return self.get(request, *args, **kwargs)
 
+
 @login_required
 def goal_delete(request, goal_id):
     """Function to delete one goal"""
@@ -629,12 +704,11 @@ def goal_delete(request, goal_id):
         messages.info(request, _("Goal delete successfully"))
     except Exception as exc:
         raise Http404
-    
+
     return redirect('administrativelevels:priorities_goals', administrative_level_id=administrative_level_id)
 
 
-
-#Priorities
+# Priorities
 class PrioritiesListView(PageMixin, LoginRequiredMixin, TemplateView):
     model = VillagePriority
     template_name = 'priorities/priorities.html'
@@ -655,26 +729,28 @@ class PrioritiesListView(PageMixin, LoginRequiredMixin, TemplateView):
         ctx = super(PrioritiesListView, self).get_context_data(**kwargs)
         ctx.setdefault('administrativelevel_village', PrioritiesListView.administrativelevel_village)
         ctx.setdefault('components', Component.objects.all())
-        ctx.setdefault('goals', VillageGoal.objects.filter(administrative_level=PrioritiesListView.administrativelevel_village))
-        
-        ctx.setdefault('priorities', VillagePriority.objects.filter(administrative_level_id=PrioritiesListView.administrative_level_id).order_by('ranking'))
-        
+        ctx.setdefault('goals',
+                       VillageGoal.objects.filter(administrative_level=PrioritiesListView.administrativelevel_village))
+
+        ctx.setdefault('priorities', VillagePriority.objects.filter(
+            administrative_level_id=PrioritiesListView.administrative_level_id).order_by('ranking'))
+
         return ctx
 
     def get(self, request, *args, **kwargs):
         try:
             PrioritiesListView.administrative_level_id = kwargs['administrative_level_id']
-            PrioritiesListView.administrativelevel_village = AdministrativeLevel.objects.get(id=PrioritiesListView.administrative_level_id, type="Village")
+            PrioritiesListView.administrativelevel_village = AdministrativeLevel.objects.get(
+                id=PrioritiesListView.administrative_level_id, type="Village")
             context = super(PrioritiesListView, self).get(request, *args, **kwargs)
             # context['priorities'] = VillagePriority.objects.filter(administrative_level_id=PrioritiesListView.administrative_level_id)
-            
+
         except Exception as exc:
             raise Http404
         return context
-    
 
     def post(self, request, *args, **kwargs):
-        
+
         component_id = request.POST.get('component')
         proposed_men = request.POST.get('proposed_men')
         proposed_women = request.POST.get('proposed_women')
@@ -716,11 +792,12 @@ class PrioritiesListView(PageMixin, LoginRequiredMixin, TemplateView):
                             break
                     except Exception as exc:
                         raise Http404
-                        
+
         if not component_id or not climate_changing_contribution:
             messages.info(request, _("Choice one component and give the description!"))
 
         return self.get(request, *args, **kwargs)
+
 
 @login_required
 def priority_delete(request, priority_id):
@@ -733,17 +810,16 @@ def priority_delete(request, priority_id):
         messages.info(request, _("Priority delete successfully"))
     except Exception as exc:
         raise Http404
-    
+
     return redirect('administrativelevels:priorities_priorities', administrative_level_id=administrative_level_id)
 
 
-
-#====================== Geographical unit=========================================
+# ====================== Geographical unit=========================================
 class GeographicalUnitListView(PageMixin, LoginRequiredMixin, ListView):
     """Display geographical unit list"""
 
     model = GeographicalUnit
-    queryset = [] #GeographicalUnit.objects.all()
+    queryset = []  # GeographicalUnit.objects.all()
     template_name = 'geographical_unit_list.html'
     context_object_name = 'geographicalunits'
     title = _('Geographical units')
@@ -772,11 +848,12 @@ class GeographicalUnitListView(PageMixin, LoginRequiredMixin, ListView):
             return Paginator(_gs, 100).get_page(page_number)
         else:
             return Paginator(GeographicalUnit.objects.all(), 100).get_page(page_number)
-        
+
     def get_context_data(self, **kwargs):
         ctx = super(GeographicalUnitListView, self).get_context_data(**kwargs)
         ctx['search'] = self.request.GET.get("search", None)
         return ctx
+
 
 class GeographicalUnitCreateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin, CreateView):
     model = GeographicalUnit
@@ -790,15 +867,15 @@ class GeographicalUnitCreateView(PageMixin, LoginRequiredMixin, AdminPermissionR
             'title': title
         },
     ]
- 
-    form_class = GeographicalUnitForm # specify the class form to be displayed
+
+    form_class = GeographicalUnitForm  # specify the class form to be displayed
 
     def post(self, request, *args, **kwargs):
         form = GeographicalUnitForm(request.POST)
         if form.is_valid():
             # cvds = form.cleaned_data['cvds']
             villages = form.cleaned_data['villages']
-            
+
             unit = form.save(commit=False)
             # length_str = str(len(GeographicalUnit.objects.all())+1)
             try:
@@ -807,7 +884,7 @@ class GeographicalUnitCreateView(PageMixin, LoginRequiredMixin, AdminPermissionR
                 length_str = "1"
             # import zlib
             # unit.unique_code = str(zlib.adler32(str(('0'*(9-len(length_str)))+length_str).encode('utf-8')))[:6]
-            unit.unique_code = ('0'*(9-len(length_str))) + length_str
+            unit.unique_code = ('0' * (9 - len(length_str))) + length_str
             unit = unit.save_and_return_object()
 
             for village_id in villages:
@@ -820,7 +897,8 @@ class GeographicalUnitCreateView(PageMixin, LoginRequiredMixin, AdminPermissionR
 
             return redirect('administrativelevels:geographical_units_list')
         return super(GeographicalUnitCreateView, self).get(request, *args, **kwargs)
-    
+
+
 class GeographicalUnitUpdateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin, UpdateView):
     model = GeographicalUnit
     template_name = 'geographical_unit_create.html'
@@ -833,8 +911,9 @@ class GeographicalUnitUpdateView(PageMixin, LoginRequiredMixin, AdminPermissionR
             'title': title
         },
     ]
- 
-    form_class = GeographicalUnitForm # specify the class form to be displayed
+
+    form_class = GeographicalUnitForm  # specify the class form to be displayed
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form'] = GeographicalUnitForm(initial={
@@ -846,12 +925,13 @@ class GeographicalUnitUpdateView(PageMixin, LoginRequiredMixin, AdminPermissionR
         # context['villages'] = self.get_object().geographical_unit.get_villages()
 
         return context
+
     def post(self, request, *args, **kwargs):
         form = GeographicalUnitForm(request.POST, instance=self.get_object())
         if form.is_valid():
             # cvds = form.cleaned_data['cvds']
             villages = form.cleaned_data['villages']
-            
+
             unit = form.save(commit=False)
             unit = unit.save_and_return_object()
             unit.administrativelevel_set.clear()
@@ -876,6 +956,7 @@ class GeographicalUnitUpdateView(PageMixin, LoginRequiredMixin, AdminPermissionR
             return redirect('administrativelevels:geographical_units_list')
         return super(GeographicalUnitUpdateView, self).get(request, *args, **kwargs)
 
+
 class GeographicalUnitDetailView(PageMixin, LoginRequiredMixin, DetailView):
     """Class to present the detail page of one geographical unit"""
     model = GeographicalUnit
@@ -893,17 +974,15 @@ class GeographicalUnitDetailView(PageMixin, LoginRequiredMixin, DetailView):
             'title': title
         },
     ]
-    
 
 
-
-#======================================CVD==============================================
+# ======================================CVD==============================================
 
 class CVDListView(PageMixin, LoginRequiredMixin, ListView):
     """Display geographical unit list"""
 
     model = CVD
-    queryset = [] #CVD.objects.filter()
+    queryset = []  # CVD.objects.filter()
     template_name = 'cvds_list.html'
     context_object_name = 'cvds'
     title = _('CVD')
@@ -947,9 +1026,9 @@ class CVDCreateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
             'title': title
         },
     ]
- 
-    form_class = CVDForm # specify the class form to be displayed
-    
+
+    form_class = CVDForm  # specify the class form to be displayed
+
     def post(self, request, *args, **kwargs):
         form = CVDForm(request.POST)
         if form.is_valid():
@@ -961,7 +1040,7 @@ class CVDCreateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
                 length_str = str(CVD.objects.all().last().pk + 1)
             except Exception as exc:
                 length_str = "1"
-            cvd.unique_code = ('0'*(9-len(length_str))) + length_str
+            cvd.unique_code = ('0' * (9 - len(length_str))) + length_str
             cvd = cvd.save_and_return_object()
 
             for village_id in villages:
@@ -988,8 +1067,9 @@ class CVDUpdateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
             'title': title
         },
     ]
- 
-    form_class = CVDForm # specify the class form to be displayed
+
+    form_class = CVDForm  # specify the class form to be displayed
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form'] = CVDForm(initial={
@@ -1001,7 +1081,7 @@ class CVDUpdateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
         # context['villages'] = self.get_object().geographical_unit.get_villages()
 
         return context
-    
+
     def post(self, request, *args, **kwargs):
         form = CVDForm(request.POST, instance=self.get_object())
         if form.is_valid():
@@ -1022,7 +1102,8 @@ class CVDUpdateView(PageMixin, LoginRequiredMixin, AdminPermissionRequiredMixin,
 
             return redirect('administrativelevels:cvds_list')
         return super(CVDUpdateView, self).get(request, *args, **kwargs)
-    
+
+
 class CVDDetailView(PageMixin, LoginRequiredMixin, DetailView):
     """Class to present the detail page of one CVD"""
     model = CVD
@@ -1040,4 +1121,3 @@ class CVDDetailView(PageMixin, LoginRequiredMixin, DetailView):
             'title': title
         },
     ]
-    
